@@ -1,5 +1,5 @@
 "use client";
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { blankDemo, fields, isUpcoming, localDate, metrics, needsReview, safeLink, statuses } from "../lib/fields";
 import type { Demo, DemoInput, Field } from "../lib/fields";
 
@@ -71,10 +71,10 @@ export default function Tracker() {
     }
   }
 
-  async function saveRow(id: string, draft: DemoInput) {
+  async function saveField(id: string, value: Partial<DemoInput>) {
     setError("");
     try {
-      const updated = await api(`/api/demos/${id}`, json("PATCH", draft));
+      const updated = await api(`/api/demos/${id}`, json("PATCH", value));
       setDemos(ds => ds.map(d => d.id === id ? updated : d));
       setNotice("Saved.");
     } catch (e) {
@@ -119,7 +119,7 @@ export default function Tracker() {
           <table>
             <thead><tr>{editableFields.map(field => <th className={field.className} key={field.key}>{field.label}</th>)}</tr></thead>
             <tbody>
-              {filtered.map(demo => <EditableRow demo={demo} key={demo.id} save={saveRow} />)}
+              {filtered.map(demo => <EditableRow demo={demo} key={demo.id} save={saveField} />)}
             </tbody>
           </table>
           {loading ? <div className="empty">Loading demos...</div> : !filtered.length && <div className="empty">No demos match this view.</div>}
@@ -129,28 +129,27 @@ export default function Tracker() {
   </>;
 }
 
-function EditableRow({ demo, save }: { demo: Demo; save: (id: string, draft: DemoInput) => Promise<void> }) {
+function EditableRow({ demo, save }: { demo: Demo; save: (id: string, value: Partial<DemoInput>) => Promise<void> }) {
   const [draft, setDraft] = useState(demo);
   const [saving, setSaving] = useState(false);
-  const [dirty, setDirty] = useState(false);
+  const saveQueue = useRef(Promise.resolve());
 
   useEffect(() => {
     setDraft(demo);
-    setDirty(false);
   }, [demo]);
 
-  async function commit(next = draft) {
-    if (!dirty && next === draft) return;
-    setSaving(true);
-    const clean = Object.fromEntries(fields.map(([key]) => [key, next[key]])) as DemoInput;
-    await save(demo.id, clean);
-    setSaving(false);
-    setDirty(false);
+  async function commit(key: Field, value: string) {
+    if (demo[key] === value) return;
+    saveQueue.current = saveQueue.current.catch(() => {}).then(async () => {
+      setSaving(true);
+      await save(demo.id, { [key]: value });
+      setSaving(false);
+    });
+    await saveQueue.current;
   }
 
   function update(key: Field, value: string) {
     setDraft(current => ({ ...current, [key]: value }));
-    setDirty(true);
   }
 
   return <tr className={saving ? "saving" : ""}>
@@ -158,13 +157,13 @@ function EditableRow({ demo, save }: { demo: Demo; save: (id: string, draft: Dem
       {field.key === "status" ? <select className={`status ${statusClass(draft.status)}`} aria-label={`Status for ${draft.company}`} value={draft.status} onChange={async e => {
         const next = { ...draft, status: e.target.value };
         setDraft(next);
-        setDirty(true);
-        await commit(next);
+        await commit("status", next.status);
       }}>{statuses.map(s => <option key={s}>{s}</option>)}</select>
-        : field.key === "notes" ? <textarea aria-label={field.label} rows={1} value={draft[field.key]} onChange={e => update(field.key, e.target.value)} onBlur={() => void commit()} />
-        : <div className="input-wrap"><input aria-label={field.label} type={inputType(field.key)} value={draft[field.key]} placeholder={field.key === "crmLink" ? "https://..." : ""} onChange={e => update(field.key, e.target.value)} onBlur={() => void commit()} />{field.key === "crmLink" && safeLink(draft.crmLink) && <a href={safeLink(draft.crmLink)} target="_blank" rel="noreferrer" aria-label={`Open link for ${draft.company}`}>Open</a>}</div>}
+        : field.key === "notes" ? <textarea aria-label={field.label} rows={1} value={draft[field.key]} onChange={e => update(field.key, e.target.value)} onBlur={e => void commit(field.key, e.currentTarget.value)} />
+        : <div className="input-wrap"><input aria-label={field.label} type={inputType(field.key)} value={draft[field.key]} placeholder={field.key === "crmLink" ? "https://..." : ""} onChange={e => update(field.key, e.target.value)} onBlur={e => void commit(field.key, e.currentTarget.value)} />{field.key === "crmLink" && linkFor(draft) && <a href={linkFor(draft)} target="_blank" rel="noreferrer" aria-label={`Open link for ${draft.company}`}>Open</a>}</div>}
     </td>)}
   </tr>;
 }
 
 const statusClass = (status: string) => ({ Showed: "green", "No Show": "red", Upcoming: "amber", Tentative: "amber", Rescheduled: "blue", "Closed Won": "green", "Closed Lost": "red" }[status] || "gray");
+const linkFor = (demo: DemoInput) => safeLink(demo.crmLink) || (demo.companyId ? `https://secure.coffee.inc/#/queue?from=CallLog&companyId=${encodeURIComponent(demo.companyId)}` : undefined);
