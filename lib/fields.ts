@@ -1,5 +1,5 @@
 export const statuses = ["Upcoming", "Tentative", "Showed", "No Show", "Cancelled", "Rescheduled", "Disqualified", "Closed Won", "Closed Lost", "Unknown / Needs Update"] as const;
-export const verticals = ["Roofing", "HVAC", "Plumbing", "Remodeling", "Construction", "Energy", "Distributor", "Other"] as const;
+export const verticals = ["HVAC", "Roofing", "Remodellers", "Plumbing", "Other"] as const;
 export const fields = [
   ["company", "Company name", "text"], ["contact", "Prospect / contact", "text"],
   ["title", "Role / title", "text"], ["phone", "Phone", "tel"], ["email", "Email", "email"],
