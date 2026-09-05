@@ -4,7 +4,7 @@ import type { DemoInput } from "../lib/fields.ts";
 function classify(company: string) {
   const name = company.toLowerCase();
   if (/(roof|siding|chimney|solar)/.test(name)) return "Roofing";
-  if (/(heating|cooling|hvac|air conditioning|heat and air| air\b|mechanical|climate|duct)/.test(name)) return "HVAC";
+  if (/(heating|cooling|hvac|air conditioning|heat and air|\bair\b|mechanical|climate|duct)/.test(name)) return "HVAC";
   if (/(plumbing|water heater)/.test(name)) return "Plumbing";
   if (/(remodel|home solutions|home remodeling)/.test(name)) return "Remodeling";
   if (/(construction|contracting|contractor|development|built)/.test(name)) return "Construction";

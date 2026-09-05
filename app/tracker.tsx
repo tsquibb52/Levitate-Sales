@@ -135,7 +135,7 @@ function EditableRow({ demo, save }: { demo: Demo; save: (id: string, value: Par
   return <tr className={saving ? "saving" : ""}>
     {displayFields.map(field => <td className={field.className} key={field.key}>
       {field.key === "lead" ? linkFor(draft) ? <a className="lead-icon" href={linkFor(draft)} target="_blank" rel="noreferrer" aria-label={`Open lead for ${draft.company}`}>☕</a> : <span className="muted">-</span>
-        : field.key === "vertical" ? <select aria-label={`Vertical for ${draft.company}`} value={draft.vertical} onChange={async e => {
+        : field.key === "vertical" ? <select className={`vertical ${verticalClass(draft.vertical)}`} aria-label={`Vertical for ${draft.company}`} value={draft.vertical} onChange={async e => {
           const next = { ...draft, vertical: e.target.value };
           setDraft(next);
           await commit("vertical", next.vertical);
@@ -151,6 +151,7 @@ function EditableRow({ demo, save }: { demo: Demo; save: (id: string, value: Par
 }
 
 const statusClass = (status: string) => ({ Showed: "green", "No Show": "red", Cancelled: "red", Upcoming: "amber", Tentative: "violet", Rescheduled: "blue", "Closed Won": "green", "Closed Lost": "red", Disqualified: "slate" }[status] || "gray");
+const verticalClass = (vertical: string) => ({ Roofing: "roofing", HVAC: "hvac", Plumbing: "plumbing", Remodeling: "remodeling", Construction: "construction", Energy: "energy", Distributor: "distributor" }[vertical] || "other");
 const linkFor = (demo: DemoInput) => safeLink(demo.crmLink) || (demo.companyId ? `https://secure.coffee.inc/#/queue?from=CallLog&companyId=${encodeURIComponent(demo.companyId)}` : undefined);
 const formatValue = (key: Field, value: string) => {
   if (!value) return "-";
