@@ -24,6 +24,9 @@ test("shows a locked demo list with editable vertical and status", async ({ page
   await expect(page.getByRole("button", { name: /Export/ })).toHaveCount(0);
   await expect(page.getByRole("button", { name: "Add demo" })).toHaveCount(0);
   await expect(page.locator("thead")).not.toBeVisible();
+  await expect(page.getByLabel("Filter status")).toHaveCount(0);
+  await page.getByRole("button", { name: "Filters", exact: true }).click();
+  await expect(page.getByLabel("Filter status")).toBeVisible();
 
   await page.getByLabel("Search demos").fill("Inline Roofing Co");
   const row = page.locator("tbody tr").first();
@@ -45,6 +48,9 @@ test("shows a locked demo list with editable vertical and status", async ({ page
   await page.getByLabel("Search demos").fill("Inline Roofing Co");
   await expect(page.locator("tbody tr").first().getByLabel("Vertical for Inline Roofing Co")).toHaveValue("Roofing");
   await expect(page.getByLabel("Status for Inline Roofing Co")).toHaveValue("Performed");
+  await page.getByRole("button", { name: "Filters", exact: true }).click();
+  await page.getByLabel("Filter status").selectOption("Performed");
+  await page.getByLabel("Filter vertical").selectOption("Roofing");
   await page.getByLabel("From date").fill("2026-09-01");
   await page.getByLabel("To date").fill("2026-09-30");
   await expect(page.locator("tbody tr")).toHaveCount(1);
