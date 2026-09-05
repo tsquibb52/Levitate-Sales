@@ -8,6 +8,7 @@
     "build": "next build",
     "start": "next start --hostname 127.0.0.1",
     "seed": "node --experimental-strip-types scripts/seed.ts",
+    "apply-review": "node --experimental-strip-types scripts/apply-review.ts",
     "test": "node --experimental-strip-types --test tests/database.test.ts",
     "test:browser": "playwright test",
     "typecheck": "tsc --noEmit"

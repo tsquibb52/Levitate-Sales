@@ -1,60 +1,49 @@
 import { test, expect } from "@playwright/test";
-import ExcelJS from "exceljs";
-test("create, edit, reschedule, duplicate, import, filter and delete", async ({ page }) => {
+
+test("add and edit demos directly in the list", async ({ page }) => {
   const errors: string[] = [];
   page.on("pageerror", e => errors.push(e.message));
+
   await page.goto("/");
-  await expect(page.getByRole("heading", { name: "Demo desk." })).toBeVisible();
+  await expect(page.getByRole("button", { name: "Add demo" })).toBeVisible();
+  await expect(page.getByText("SALES OPERATIONS")).toHaveCount(0);
+  await expect(page.getByRole("button", { name: /Import/ })).toHaveCount(0);
+  await expect(page.getByRole("button", { name: /Export/ })).toHaveCount(0);
+
   await page.getByRole("button", { name: "Add demo" }).click();
-  await page.getByLabel("Company name").fill("Browser Test Co");
-  await page.getByLabel("Prospect / contact").fill("Alex Test");
-  await page.getByRole("dialog").getByLabel("Demo date", { exact: true }).fill("2026-08-20");
-  await page.getByLabel("Coffee / CRM link").fill("https://example.com/lead");
-  await page.getByRole("button", { name: "Save demo" }).click();
-  await expect(page.getByRole("status")).toContainText("Demo created");
-  await page.getByLabel("Status for Browser Test Co").selectOption("Showed");
-  await expect(page.getByRole("status")).toContainText("Status saved");
+  await expect(page.getByRole("status")).toContainText("Demo added");
+
+  const row = page.locator("tbody tr").first();
+  await row.getByLabel("Company").fill("Inline Test Co");
+  await row.getByLabel("Company").blur();
+  await expect(page.getByRole("status")).toContainText("Saved");
+
+  await row.getByLabel("Contact").fill("Alex Test");
+  await row.getByLabel("Contact").blur();
+  await row.getByLabel("Demo date").fill("2026-09-20");
+  await row.getByLabel("Demo date").blur();
+  await row.getByLabel("Lead link").fill("https://example.com/lead");
+  await row.getByLabel("Lead link").blur();
+  await row.getByLabel("Vertical").fill("Roofing");
+  await row.getByLabel("Vertical").blur();
+  await row.getByLabel("AE").fill("Taylor");
+  await row.getByLabel("AE").blur();
+  await page.getByLabel("Status for Inline Test Co").selectOption("Showed");
+
   await page.reload();
-  await expect(page.getByLabel("Status for Browser Test Co")).toHaveValue("Showed");
-  await expect(page.getByRole("link", { name: "Open lead" })).toHaveAttribute("target", "_blank");
-  await page.getByLabel("Status for Browser Test Co").selectOption("Rescheduled");
-  await page.getByRole("dialog").getByLabel("Demo date", { exact: true }).fill("2026-09-20");
-  await page.getByRole("button", { name: "Save demo" }).click();
-  await expect(page.getByRole("dialog")).not.toBeVisible();
-  await page.getByRole("button", { name: "B Browser Test Co", exact: true }).click();
-  await page.getByRole("button", { name: /History/ }).click();
-  await expect(page.locator(".history-item").filter({ hasText: "Demo date changed" })).toContainText("2026-08-20");
-  await page.getByRole("button", { name: "Duplicate", exact: true }).click();
-  await page.getByLabel("Company name").fill("Duplicate Co");
-  await page.getByRole("button", { name: "Save demo" }).click();
-  await expect(page.getByRole("dialog")).not.toBeVisible();
-  await page.getByRole("button", { name: "Import", exact: false }).click();
-  await page.locator('input[type="file"]').setInputFiles({ name: "demos.csv", mimeType: "text/csv", buffer: Buffer.from("CompanyName,Contact,Demo Perform Date,PhoneCallId\nCSV Co,Chris,2026-09-22,csv-1\nCSV Co,Chris,2026-09-22,csv-1") });
-  await page.getByRole("button", { name: "Preview import" }).click();
-  await expect(page.locator(".info")).toContainText("1 possible duplicates");
-  await page.getByRole("button", { name: "Confirm import" }).click();
-  await expect(page.getByRole("status")).toContainText("Imported 1 demos. Skipped 1 duplicates");
-  const workbook = new ExcelJS.Workbook();
-  workbook.addWorksheet("Demos").addRows([["CompanyName", "Contact", "Demo Perform Date"], ["Excel Co", "Jamie", new Date("2026-10-01T00:00:00Z")]]);
-  await page.getByRole("button", { name: "Import", exact: false }).click();
-  await page.locator('input[type="file"]').setInputFiles({ name: "demos.xlsx", mimeType: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet", buffer: Buffer.from(await workbook.xlsx.writeBuffer()) });
-  await page.getByRole("button", { name: "Preview import" }).click();
-  await expect(page.locator(".import-preview")).toContainText("2026-10-01");
-  await page.getByRole("button", { name: "Confirm import" }).click();
-  await expect(page.getByRole("dialog")).not.toBeVisible();
-  await page.getByLabel("Search company or prospect").fill("CSV Co");
+  await page.getByLabel("Search demos").fill("Inline Test Co");
+  const savedRow = page.locator("tbody tr").first();
+  await expect(savedRow.getByLabel("Company")).toHaveValue("Inline Test Co");
+  await expect(savedRow.getByLabel("Vertical")).toHaveValue("Roofing");
+  await expect(savedRow.getByLabel("AE")).toHaveValue("Taylor");
+  await expect(page.getByLabel("Status for Inline Test Co")).toHaveValue("Showed");
+  await expect(page.getByRole("link", { name: "Open" })).toHaveAttribute("target", "_blank");
+
   await expect(page.locator("tbody tr")).toHaveCount(1);
-  await page.getByLabel("Filter status").selectOption("Showed");
-  await expect(page.locator("tbody tr")).toHaveCount(0);
-  await page.getByRole("button", { name: "Clear filters" }).click();
-  await page.getByRole("button", { name: "D Duplicate Co", exact: true }).click();
-  await page.getByRole("button", { name: "Delete", exact: true }).click();
-  await page.getByRole("button", { name: "Delete permanently" }).click();
-  await expect(page.getByRole("dialog")).not.toBeVisible();
-  await expect(page.locator("tbody tr")).toHaveCount(3);
-  await page.screenshot({ path: "test-results/tracker-desktop.png", fullPage: true });
+  await page.locator("tbody tr").first().click();
+  await expect(page.getByRole("dialog")).toHaveCount(0);
+
   await page.setViewportSize({ width: 390, height: 844 });
-  await expect(page.getByRole("heading", { name: "Demo desk." })).toBeVisible();
   expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(true);
   expect(errors).toEqual([]);
 });

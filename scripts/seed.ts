@@ -3,6 +3,7 @@ import path from "node:path";
 import Papa from "papaparse";
 import { db, createDemo, transaction } from "../lib/db.ts";
 import { blankDemo } from "../lib/fields.ts";
+import { recoverUnlinkedDemos } from "../lib/recovery.ts";
 const folder = path.join(process.cwd(), "Call Logs");
 let calls = 0, bookings = 0;
 transaction(() => {
@@ -23,4 +24,7 @@ transaction(() => {
     }
   }
 });
-console.log(`Imported ${bookings} bookings and ${calls} call logs. Existing records were preserved.`);
+const recovered = recoverUnlinkedDemos();
+console.log(`Imported ${bookings} bookings, recovered ${recovered} provisional demos from follow-ups, and imported ${calls} call logs. Existing records were preserved.`);
+console.log("Call coverage is based on CSV CreationDate, not filenames:");
+console.table(db.prepare("SELECT source, MIN(calledAt) AS firstCall, MAX(calledAt) AS lastCall, COUNT(*) AS calls FROM calls GROUP BY source").all());
