@@ -1,4 +1,4 @@
-export const statuses = ["Upcoming", "Tentative", "Showed", "No Show", "Cancelled", "Rescheduled", "Disqualified", "Closed Won", "Closed Lost", "Unknown / Needs Update"] as const;
+export const statuses = ["Upcoming", "No Show", "Performed"] as const;
 export const verticals = ["HVAC", "Roofing", "Remodellers", "Plumbing", "Other"] as const;
 export const fields = [
   ["company", "Company name", "text"], ["contact", "Prospect / contact", "text"],
@@ -20,7 +20,7 @@ export type Demo = DemoInput & { id: string; createdAt: string; updatedAt: strin
 export type History = { id: number; action: string; field: string | null; oldValue: string | null; newValue: string | null; createdAt: string };
 export type Call = { id: string; companyId: string; company: string; contact: string; calledAt: string; outcome: string; transcript: string; source: string };
 export function blankDemo(): DemoInput {
-  return { ...Object.fromEntries(fields.map(([key]) => [key, ""])), status: "Unknown / Needs Update" } as DemoInput;
+  return { ...Object.fromEntries(fields.map(([key]) => [key, ""])), status: "No Show" } as DemoInput;
 }
 export function safeLink(value: string) {
   try { const url = new URL(value); return ["http:", "https:"].includes(url.protocol) ? url.href : undefined; } catch { return undefined; }
@@ -30,15 +30,15 @@ export function localDate(date = new Date()) {
 }
 export function metrics(demos: Demo[]) {
   const today = localDate();
-  const shows = demos.filter(d => d.status === "Showed" && (!d.demoDate || d.demoDate <= today)).length;
+  const shows = demos.filter(d => d.status === "Performed" && (!d.demoDate || d.demoDate <= today)).length;
   const noShows = demos.filter(d => d.status === "No Show" && (!d.demoDate || d.demoDate <= today)).length;
   return { total: demos.length, upcoming: demos.filter(d => isUpcoming(d, today)).length,
     shows, noShows, showRate: shows + noShows ? Math.round(shows / (shows + noShows) * 100) : null,
     needsUpdate: demos.filter(needsReview).length };
 }
 export function isUpcoming(demo: DemoInput, today = localDate()) {
-  return ["Upcoming", "Tentative", "Rescheduled"].includes(demo.status) && demo.demoDate >= today;
+  return demo.status === "Upcoming" && demo.demoDate >= today;
 }
 export function needsReview(demo: DemoInput) {
-  return demo.status === "Unknown / Needs Update" || demo.status === "Tentative" || (["Upcoming", "Rescheduled"].includes(demo.status) && !demo.demoDate);
+  return false;
 }

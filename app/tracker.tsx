@@ -27,7 +27,8 @@ export default function Tracker() {
   const [notice, setNotice] = useState("");
   const [search, setSearch] = useState("");
   const [status, setStatus] = useState("");
-  const [period, setPeriod] = useState("all");
+  const [from, setFrom] = useState("");
+  const [to, setTo] = useState("");
   const [view, setView] = useState("all");
   const today = localDate();
 
@@ -47,14 +48,15 @@ export default function Tracker() {
   const filtered = useMemo(() => demos.filter(d =>
     (!search || `${d.company} ${d.contact} ${d.vertical} ${d.status}`.toLowerCase().includes(search.toLowerCase())) &&
     (!status || d.status === status) &&
-    inPeriod(d.demoDate, period, today) &&
+    (!from || d.demoDate >= from) &&
+    (!to || (!!d.demoDate && d.demoDate <= to)) &&
     (view !== "upcoming" || isUpcoming(d, today)) &&
     view !== "review"
   ).sort((a, b) => {
     const aDate = a.demoDate || "9999-99-99";
     const bDate = b.demoDate || "9999-99-99";
     return aDate.localeCompare(bDate) || a.company.localeCompare(b.company);
-  }), [demos, search, status, period, view, today]);
+  }), [demos, search, status, from, to, view, today]);
 
   async function saveField(id: string, value: Partial<DemoInput>) {
     setError("");
@@ -74,22 +76,15 @@ export default function Tracker() {
         <option value="">All statuses</option>
         {statuses.map(s => <option key={s}>{s}</option>)}
       </select>
-      <select aria-label="Filter date" value={period} onChange={e => setPeriod(e.target.value)}>
-        <option value="all">All dates</option>
-        <option value="today">Today</option>
-        <option value="week">This week</option>
-        <option value="month">This month</option>
-        <option value="next-week">Next week</option>
-        <option value="next-month">Next month</option>
-        <option value="missing">Missing date</option>
-      </select>
+      <input className="date-filter" aria-label="From date" type="date" value={from} onChange={e => setFrom(e.target.value)} />
+      <input className="date-filter" aria-label="To date" type="date" value={to} min={from} onChange={e => setTo(e.target.value)} />
     </div>
 
     <section className="stats" aria-label="Demo overview">
       {[
         ["Total demos", stats.total, "All records"],
         ["Upcoming", stats.upcoming, "Scheduled from today"],
-        ["Showed", stats.shows, `${stats.noShows} no shows`],
+        ["Performed", stats.shows, `${stats.noShows} no shows`],
         ["Show rate", stats.showRate === null ? "-" : `${stats.showRate}%`, "Past demos only"]
       ].map(([label, value, hint]) => <button key={label} className={`stat ${view === label.toString().toLowerCase().split(" ")[0] ? "active" : ""}`} onClick={() => {
         if (label === "Upcoming") setView(view === "upcoming" ? "all" : "upcoming");
@@ -103,7 +98,7 @@ export default function Tracker() {
     <section className="demo-list" aria-label="Demo list">
       <div className="list-head">
         <strong>{filtered.length} of {demos.length} demos</strong>
-        {(search || status || period !== "all" || view !== "all") && <button className="text-button" onClick={() => { setSearch(""); setStatus(""); setPeriod("all"); setView("all"); }}>Clear filters</button>}
+        {(search || status || from || to || view !== "all") && <button className="text-button" onClick={() => { setSearch(""); setStatus(""); setFrom(""); setTo(""); setView("all"); }}>Clear filters</button>}
       </div>
       <div className="grid-scroll">
         <table>
@@ -151,7 +146,7 @@ function EditableRow({ demo, save }: { demo: Demo; save: (id: string, value: Par
   </tr>;
 }
 
-const statusClass = (status: string) => ({ Showed: "green", "No Show": "red", Cancelled: "red", Upcoming: "amber", Tentative: "violet", Rescheduled: "blue", "Closed Won": "green", "Closed Lost": "red", Disqualified: "slate" }[status] || "gray");
+const statusClass = (status: string) => ({ Performed: "green", "No Show": "red", Upcoming: "amber" }[status] || "gray");
 const verticalClass = (vertical: string) => ({ Roofing: "roofing", HVAC: "hvac", Plumbing: "plumbing", Remodellers: "remodellers" }[vertical] || "other");
 const leadLinkFor = (demo: DemoInput) => safeLink(demo.crmLink) || (demo.companyId ? `https://secure.coffee.inc/#/queue?from=CallLog&companyId=${encodeURIComponent(demo.companyId)}` : `https://secure.coffee.inc/#/queue?from=CallLog&search=${encodeURIComponent(demo.company)}`);
 const callLogLinkFor = (demo: DemoInput) => demo.phoneCallId ? `https://secure.coffee.inc/#/call-log/${encodeURIComponent(demo.phoneCallId)}` : undefined;
@@ -163,23 +158,3 @@ const formatTime = (value: string) => {
   return `${hour % 12 || 12}:${minute} ${hour < 12 ? "AM" : "PM"}`;
 };
 const formatSchedule = (demo: DemoInput) => demo.demoDate ? [formatDate(demo.demoDate), formatTime(demo.demoTime), demo.timeZone].filter(Boolean).join(" ") : "-";
-const addDays = (date: Date, days: number) => new Date(date.getFullYear(), date.getMonth(), date.getDate() + days);
-const iso = (date: Date) => localDate(date);
-const rangeFor = (period: string, todayText: string) => {
-  const todayDate = new Date(todayText + "T12:00:00");
-  const day = todayDate.getDay();
-  const weekStart = addDays(todayDate, -day);
-  if (period === "today") return [todayText, todayText];
-  if (period === "week") return [iso(weekStart), iso(addDays(weekStart, 6))];
-  if (period === "next-week") return [iso(addDays(weekStart, 7)), iso(addDays(weekStart, 13))];
-  if (period === "month") return [iso(new Date(todayDate.getFullYear(), todayDate.getMonth(), 1)), iso(new Date(todayDate.getFullYear(), todayDate.getMonth() + 1, 0))];
-  if (period === "next-month") return [iso(new Date(todayDate.getFullYear(), todayDate.getMonth() + 1, 1)), iso(new Date(todayDate.getFullYear(), todayDate.getMonth() + 2, 0))];
-  return ["", ""];
-};
-const inPeriod = (demoDate: string, period: string, today: string) => {
-  if (period === "all") return true;
-  if (period === "missing") return !demoDate;
-  if (!demoDate) return false;
-  const [from, to] = rangeFor(period, today);
-  return (!from || demoDate >= from) && (!to || demoDate <= to);
-};

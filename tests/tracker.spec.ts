@@ -39,13 +39,14 @@ test("shows a locked demo list with editable vertical and status", async ({ page
   await expect(row.getByRole("link", { name: "Open recording for Inline Roofing Co" })).toBeVisible();
   await expect(row.getByRole("link", { name: "Open recording for Inline Roofing Co" })).toHaveAttribute("href", /call-log\/a0a0dd04-dab8-4c48-a255-8707faa1f56f/);
   await row.getByLabel("Vertical for Inline Roofing Co").selectOption("Roofing");
-  await row.getByLabel("Status for Inline Roofing Co").selectOption("Showed");
+  await row.getByLabel("Status for Inline Roofing Co").selectOption("Performed");
 
   await page.reload();
   await page.getByLabel("Search demos").fill("Inline Roofing Co");
   await expect(page.locator("tbody tr").first().getByLabel("Vertical for Inline Roofing Co")).toHaveValue("Roofing");
-  await expect(page.getByLabel("Status for Inline Roofing Co")).toHaveValue("Showed");
-  await page.getByLabel("Filter date").selectOption("month");
+  await expect(page.getByLabel("Status for Inline Roofing Co")).toHaveValue("Performed");
+  await page.getByLabel("From date").fill("2026-09-01");
+  await page.getByLabel("To date").fill("2026-09-30");
   await expect(page.locator("tbody tr")).toHaveCount(1);
   await expect(page.locator("tbody tr")).toHaveCount(1);
   await page.locator("tbody tr").first().click();

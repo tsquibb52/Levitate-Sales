@@ -9,12 +9,12 @@ process.env.DEMO_DB_PATH = path.join(directory, "test.sqlite");
 const { db, transaction, createDemo, updateDemo, detail, listDemos, deleteDemo, possibleDuplicate, validate } = await import("../lib/db.ts");
 after(() => { db.close(); rmSync(directory, { recursive: true, force: true }); });
 test("persists edits and preserves original schedule in history", () => {
-  const demo = transaction(() => createDemo({ ...blankDemo(), company: "Test Company", demoDate: "2026-01-02", status: "Upcoming" }));
-  updateDemo(demo.id, { demoDate: "2026-01-08", status: "Rescheduled", notes: "New appointment" });
+  const demo = transaction(() => createDemo({ ...blankDemo(), company: "Test Company", demoDate: "2026-01-02", status: "No Show" }));
+  updateDemo(demo.id, { demoDate: "2026-01-08", status: "Upcoming", notes: "New appointment" });
   const record = detail(demo.id)!;
   assert.equal(record.demo.demoDate, "2026-01-08");
   assert.equal(record.history.find(h => h.field === "demoDate")?.oldValue, "2026-01-02");
-  assert.equal(record.history.find(h => h.field === "status")?.newValue, "Rescheduled");
+  assert.equal(record.history.find(h => h.field === "status")?.newValue, "Upcoming");
   assert.equal(record.history.length, 4);
   deleteDemo(demo.id);
   assert.equal(detail(demo.id), null);
@@ -38,14 +38,14 @@ test("validates calendar dates, status and URL schemes", () => {
     assert.throws(() => validate({ ...blankDemo(), company: "Validation", ...extra }));
   }
 });
-test("show rate excludes future demos and unknown outcomes", () => {
+test("show rate excludes future performed demos", () => {
   const base = { ...blankDemo(), id: "test", company: "Metrics", createdAt: "", updatedAt: "" };
   const result = metrics([
-    { ...base, status: "Showed", demoDate: "2020-01-01" },
+    { ...base, status: "Performed", demoDate: "2020-01-01" },
     { ...base, status: "No Show", demoDate: "2020-01-01" },
-    { ...base, status: "Showed", demoDate: "2099-01-01" },
+    { ...base, status: "Performed", demoDate: "2099-01-01" },
     { ...base, status: "Upcoming", demoDate: "2099-01-01" },
-    { ...base, status: "Unknown / Needs Update" }
+    { ...base, status: "No Show", demoDate: "2099-01-01" }
   ]);
-  assert.equal(result.showRate, 50); assert.equal(result.upcoming, 1); assert.equal(result.needsUpdate, 1);
+  assert.equal(result.showRate, 50); assert.equal(result.upcoming, 1); assert.equal(result.needsUpdate, 0);
 });
