@@ -1,0 +1,31 @@
+{
+  "name": "levitate-demo-tracker",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "next dev --hostname 127.0.0.1",
+    "build": "next build",
+    "start": "next start --hostname 127.0.0.1",
+    "seed": "node --experimental-strip-types scripts/seed.ts",
+    "test": "node --experimental-strip-types --test tests/database.test.ts",
+    "test:browser": "playwright test",
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "next": "^16.3.4",
+    "react": "^19.1.0",
+    "react-dom": "^19.1.0",
+    "papaparse": "^5.5.3",
+    "exceljs": "^4.4.0"
+  },
+  "overrides": { "exceljs": { "uuid": "^11.1.1" } },
+  "devDependencies": {
+    "@types/node": "^24.0.0",
+    "@types/react": "^19.1.0",
+    "@types/react-dom": "^19.1.0",
+    "@types/papaparse": "^5.3.16",
+    "typescript": "^5.9.0",
+    "@playwright/test": "^1.55.0"
+  }
+}
