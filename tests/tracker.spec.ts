@@ -1,44 +1,47 @@
 import { test, expect } from "@playwright/test";
 
-test("add and edit demos directly in the list", async ({ page }) => {
+test("shows a locked demo list with editable vertical and status", async ({ page }) => {
   const errors: string[] = [];
   page.on("pageerror", e => errors.push(e.message));
 
   await page.goto("/");
-  await expect(page.getByRole("button", { name: "Add demo" })).toBeVisible();
-  await expect(page.getByText("SALES OPERATIONS")).toHaveCount(0);
+  const response = await page.request.post("/api/demos", {
+    data: {
+      company: "Inline Roofing Co",
+      contact: "Alex Test",
+      demoDate: "2026-09-20",
+      demoTime: "10:00",
+      status: "Upcoming",
+      companyId: "11111111-1111-4111-8111-111111111111"
+    }
+  });
+  expect(response.ok()).toBe(true);
+  await page.reload();
+
   await expect(page.getByRole("button", { name: /Import/ })).toHaveCount(0);
   await expect(page.getByRole("button", { name: /Export/ })).toHaveCount(0);
+  await expect(page.getByRole("button", { name: "Add demo" })).toHaveCount(0);
+  await expect(page.getByRole("columnheader", { name: "AE" })).toHaveCount(0);
+  await expect(page.getByRole("columnheader", { name: "Notes" })).toHaveCount(0);
 
-  await page.getByRole("button", { name: "Add demo" }).click();
-  await expect(page.getByRole("status")).toContainText("Demo added");
-
+  await page.getByLabel("Search demos").fill("Inline Roofing Co");
   const row = page.locator("tbody tr").first();
-  await row.getByLabel("Company").fill("Inline Test Co");
-  await row.getByLabel("Company").blur();
-  await expect(page.getByRole("status")).toContainText("Saved");
+  await expect(row).toContainText("Inline Roofing Co");
+  await expect(row).toContainText("Alex Test");
+  await expect(row.getByLabel("Company")).toHaveCount(0);
+  await expect(row.getByLabel("Contact")).toHaveCount(0);
+  await expect(row.getByLabel("Demo date")).toHaveCount(0);
+  await expect(row.getByLabel("Time")).toHaveCount(0);
 
-  await row.getByLabel("Contact").fill("Alex Test");
-  await row.getByLabel("Contact").blur();
-  await row.getByLabel("Demo date").fill("2026-09-20");
-  await row.getByLabel("Demo date").blur();
-  await row.getByLabel("Lead link").fill("https://example.com/lead");
-  await row.getByLabel("Lead link").blur();
-  await row.getByLabel("Vertical").fill("Roofing");
-  await row.getByLabel("Vertical").blur();
-  await row.getByLabel("AE").fill("Taylor");
-  await row.getByLabel("AE").blur();
-  await page.getByLabel("Status for Inline Test Co").selectOption("Showed");
+  await expect(row.getByRole("link", { name: "Open lead for Inline Roofing Co" })).toHaveText("☕");
+  await expect(row.getByRole("link", { name: "Open lead for Inline Roofing Co" })).toHaveAttribute("href", /secure\.coffee\.inc/);
+  await row.getByLabel("Vertical for Inline Roofing Co").selectOption("Roofing");
+  await row.getByLabel("Status for Inline Roofing Co").selectOption("Showed");
 
   await page.reload();
-  await page.getByLabel("Search demos").fill("Inline Test Co");
-  const savedRow = page.locator("tbody tr").first();
-  await expect(savedRow.getByLabel("Company")).toHaveValue("Inline Test Co");
-  await expect(savedRow.getByLabel("Vertical")).toHaveValue("Roofing");
-  await expect(savedRow.getByLabel("AE")).toHaveValue("Taylor");
-  await expect(page.getByLabel("Status for Inline Test Co")).toHaveValue("Showed");
-  await expect(page.getByRole("link", { name: "Open" })).toHaveAttribute("target", "_blank");
-
+  await page.getByLabel("Search demos").fill("Inline Roofing Co");
+  await expect(page.locator("tbody tr").first().getByLabel("Vertical for Inline Roofing Co")).toHaveValue("Roofing");
+  await expect(page.getByLabel("Status for Inline Roofing Co")).toHaveValue("Showed");
   await expect(page.locator("tbody tr")).toHaveCount(1);
   await page.locator("tbody tr").first().click();
   await expect(page.getByRole("dialog")).toHaveCount(0);

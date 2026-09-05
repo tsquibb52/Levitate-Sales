@@ -1,18 +1,16 @@
 "use client";
 import { useEffect, useMemo, useRef, useState } from "react";
-import { blankDemo, fields, isUpcoming, localDate, metrics, needsReview, safeLink, statuses } from "../lib/fields";
+import { isUpcoming, localDate, metrics, needsReview, safeLink, statuses, verticals } from "../lib/fields";
 import type { Demo, DemoInput, Field } from "../lib/fields";
 
-const editableFields: { key: Field; label: string; className?: string }[] = [
+const displayFields: { key: Field | "lead"; label: string; className?: string }[] = [
   { key: "company", label: "Company", className: "wide-cell" },
   { key: "contact", label: "Contact" },
   { key: "demoDate", label: "Demo date" },
   { key: "demoTime", label: "Time" },
-  { key: "status", label: "Status" },
-  { key: "crmLink", label: "Lead link", className: "wide-cell" },
+  { key: "lead", label: "Lead" },
   { key: "vertical", label: "Vertical" },
-  { key: "ae", label: "AE" },
-  { key: "notes", label: "Notes", className: "notes-cell" }
+  { key: "status", label: "Status" }
 ];
 
 async function api(url: string, options?: RequestInit) {
@@ -23,7 +21,6 @@ async function api(url: string, options?: RequestInit) {
 }
 
 const json = (method: string, value: unknown) => ({ method, headers: { "Content-Type": "application/json" }, body: JSON.stringify(value) });
-const inputType = (key: Field) => fields.find(([field]) => field === key)?.[2] || "text";
 
 export default function Tracker() {
   const [demos, setDemos] = useState<Demo[]>([]);
@@ -49,7 +46,7 @@ export default function Tracker() {
 
   const stats = metrics(demos);
   const filtered = useMemo(() => demos.filter(d =>
-    (!search || `${d.company} ${d.contact} ${d.vertical} ${d.ae} ${d.notes}`.toLowerCase().includes(search.toLowerCase())) &&
+    (!search || `${d.company} ${d.contact} ${d.vertical} ${d.status}`.toLowerCase().includes(search.toLowerCase())) &&
     (!status || d.status === status) &&
     (view !== "upcoming" || isUpcoming(d, today)) &&
     (view !== "review" || needsReview(d))
@@ -58,18 +55,6 @@ export default function Tracker() {
     const bDate = b.demoDate || "9999-99-99";
     return aDate.localeCompare(bDate) || a.company.localeCompare(b.company);
   }), [demos, search, status, view, today]);
-
-  async function addDemo() {
-    setError("");
-    const draft = { ...blankDemo(), company: "New demo", bookedDate: today, status: "Upcoming" };
-    try {
-      const created = await api("/api/demos", json("POST", draft));
-      setDemos(ds => [created, ...ds]);
-      setNotice("Demo added. Type over the row to fill it in.");
-    } catch (e) {
-      setError((e as Error).message);
-    }
-  }
 
   async function saveField(id: string, value: Partial<DemoInput>) {
     setError("");
@@ -90,7 +75,6 @@ export default function Tracker() {
           <option value="">All statuses</option>
           {statuses.map(s => <option key={s}>{s}</option>)}
         </select>
-        <button className="primary" onClick={() => void addDemo()}>Add demo</button>
       </div>
 
       <section className="stats" aria-label="Demo overview">
@@ -117,7 +101,7 @@ export default function Tracker() {
         </div>
         <div className="grid-scroll">
           <table>
-            <thead><tr>{editableFields.map(field => <th className={field.className} key={field.key}>{field.label}</th>)}</tr></thead>
+            <thead><tr>{displayFields.map(field => <th className={field.className} key={field.key}>{field.label}</th>)}</tr></thead>
             <tbody>
               {filtered.map(demo => <EditableRow demo={demo} key={demo.id} save={saveField} />)}
             </tbody>
@@ -148,22 +132,28 @@ function EditableRow({ demo, save }: { demo: Demo; save: (id: string, value: Par
     await saveQueue.current;
   }
 
-  function update(key: Field, value: string) {
-    setDraft(current => ({ ...current, [key]: value }));
-  }
-
   return <tr className={saving ? "saving" : ""}>
-    {editableFields.map(field => <td className={field.className} key={field.key}>
-      {field.key === "status" ? <select className={`status ${statusClass(draft.status)}`} aria-label={`Status for ${draft.company}`} value={draft.status} onChange={async e => {
+    {displayFields.map(field => <td className={field.className} key={field.key}>
+      {field.key === "lead" ? linkFor(draft) ? <a className="lead-icon" href={linkFor(draft)} target="_blank" rel="noreferrer" aria-label={`Open lead for ${draft.company}`}>☕</a> : <span className="muted">-</span>
+        : field.key === "vertical" ? <select aria-label={`Vertical for ${draft.company}`} value={draft.vertical} onChange={async e => {
+          const next = { ...draft, vertical: e.target.value };
+          setDraft(next);
+          await commit("vertical", next.vertical);
+        }}><option value="">Choose</option>{verticals.map(v => <option key={v}>{v}</option>)}</select>
+        : field.key === "status" ? <select className={`status ${statusClass(draft.status)}`} aria-label={`Status for ${draft.company}`} value={draft.status} onChange={async e => {
         const next = { ...draft, status: e.target.value };
         setDraft(next);
         await commit("status", next.status);
       }}>{statuses.map(s => <option key={s}>{s}</option>)}</select>
-        : field.key === "notes" ? <textarea aria-label={field.label} rows={1} value={draft[field.key]} onChange={e => update(field.key, e.target.value)} onBlur={e => void commit(field.key, e.currentTarget.value)} />
-        : <div className="input-wrap"><input aria-label={field.label} type={inputType(field.key)} value={draft[field.key]} placeholder={field.key === "crmLink" ? "https://..." : ""} onChange={e => update(field.key, e.target.value)} onBlur={e => void commit(field.key, e.currentTarget.value)} />{field.key === "crmLink" && linkFor(draft) && <a href={linkFor(draft)} target="_blank" rel="noreferrer" aria-label={`Open link for ${draft.company}`}>Open</a>}</div>}
+        : <span className={!draft[field.key] ? "muted" : ""}>{formatValue(field.key, draft[field.key])}</span>}
     </td>)}
   </tr>;
 }
 
-const statusClass = (status: string) => ({ Showed: "green", "No Show": "red", Upcoming: "amber", Tentative: "amber", Rescheduled: "blue", "Closed Won": "green", "Closed Lost": "red" }[status] || "gray");
+const statusClass = (status: string) => ({ Showed: "green", "No Show": "red", Cancelled: "red", Upcoming: "amber", Tentative: "violet", Rescheduled: "blue", "Closed Won": "green", "Closed Lost": "red", Disqualified: "slate" }[status] || "gray");
 const linkFor = (demo: DemoInput) => safeLink(demo.crmLink) || (demo.companyId ? `https://secure.coffee.inc/#/queue?from=CallLog&companyId=${encodeURIComponent(demo.companyId)}` : undefined);
+const formatValue = (key: Field, value: string) => {
+  if (!value) return "-";
+  if (key === "demoDate" || key === "bookedDate") return new Date(value + "T12:00:00").toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" });
+  return value;
+};
