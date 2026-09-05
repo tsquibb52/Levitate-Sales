@@ -46,20 +46,22 @@ export default function Tracker() {
 
   useEffect(() => { void refresh(); }, []);
 
-  const stats = metrics(demos);
-  const filtered = useMemo(() => demos.filter(d =>
+  const baseFiltered = useMemo(() => demos.filter(d =>
     (!search || `${d.company} ${d.contact} ${d.vertical} ${d.status}`.toLowerCase().includes(search.toLowerCase())) &&
-    (!status || d.status === status) &&
     (!vertical || d.vertical === vertical) &&
     (!from || d.demoDate >= from) &&
-    (!to || (!!d.demoDate && d.demoDate <= to)) &&
+    (!to || (!!d.demoDate && d.demoDate <= to))
+  ), [demos, search, vertical, from, to]);
+  const stats = metrics(baseFiltered);
+  const filtered = useMemo(() => baseFiltered.filter(d =>
+    (!status || d.status === status) &&
     (view !== "upcoming" || isUpcoming(d, today)) &&
     view !== "review"
   ).sort((a, b) => {
     const aDate = a.demoDate || "9999-99-99";
     const bDate = b.demoDate || "9999-99-99";
     return aDate.localeCompare(bDate) || a.company.localeCompare(b.company);
-  }), [demos, search, status, vertical, from, to, view, today]);
+  }), [baseFiltered, status, view, today]);
 
   async function saveField(id: string, value: Partial<DemoInput>) {
     setError("");
@@ -75,7 +77,7 @@ export default function Tracker() {
   return <main>
     <div className="toolbar">
       <label className="search-shell"><span aria-hidden="true">⌕</span><input className="search" aria-label="Search demos" placeholder="Search demos..." value={search} onChange={e => setSearch(e.target.value)} /></label>
-      <button className="filter-toggle" type="button" aria-expanded={filtersOpen} onClick={() => setFiltersOpen(open => !open)}>Filters</button>
+      <button className="filter-toggle" type="button" aria-label="Filters" aria-expanded={filtersOpen} onClick={() => setFiltersOpen(open => !open)}>⌄</button>
     </div>
     {filtersOpen && <div className="filter-panel">
       <select aria-label="Filter status" value={status} onChange={e => setStatus(e.target.value)}>
@@ -86,11 +88,10 @@ export default function Tracker() {
         <option value="">Vertical</option>
         {verticals.map(v => <option key={v}>{v}</option>)}
       </select>
-      <input className="date-filter" aria-label="From date" type="date" value={from} onChange={e => setFrom(e.target.value)} />
-      <input className="date-filter" aria-label="To date" type="date" value={to} min={from} onChange={e => setTo(e.target.value)} />
+      <details className="date-range"><summary>Date</summary><div><input aria-label="From date" type="date" value={from} onChange={e => setFrom(e.target.value)} /><input aria-label="To date" type="date" value={to} min={from} onChange={e => setTo(e.target.value)} /></div></details>
     </div>}
 
-    <section className="stats" aria-label="Demo overview">
+    {!status && <section className="stats" aria-label="Demo overview">
       {[
         ["Total demos", stats.total, "All records"],
         ["Upcoming", stats.upcoming, "Scheduled from today"],
@@ -100,7 +101,7 @@ export default function Tracker() {
         if (label === "Upcoming") setView(view === "upcoming" ? "all" : "upcoming");
         else setView("all");
       }}><span>{label}</span><strong>{value}</strong><small>{hint}</small></button>)}
-    </section>
+    </section>}
 
     {error && <div className="alert error" role="alert">{error}<button onClick={() => setError("")}>Dismiss</button></div>}
     {notice && <div className="notice" role="status">{notice}<button onClick={() => setNotice("")}>Dismiss</button></div>}

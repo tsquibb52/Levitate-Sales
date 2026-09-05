@@ -51,6 +51,10 @@ test("shows a locked demo list with editable vertical and status", async ({ page
   await page.getByRole("button", { name: "Filters", exact: true }).click();
   await page.getByLabel("Filter status").selectOption("Performed");
   await page.getByLabel("Filter vertical").selectOption("Roofing");
+  await expect(page.getByLabel("Demo overview")).toHaveCount(0);
+  await page.getByLabel("Filter status").selectOption("");
+  await expect(page.getByLabel("Demo overview")).toBeVisible();
+  await page.locator(".date-range").getByText("Date").click();
   await page.getByLabel("From date").fill("2026-09-01");
   await page.getByLabel("To date").fill("2026-09-30");
   await expect(page.locator("tbody tr")).toHaveCount(1);
