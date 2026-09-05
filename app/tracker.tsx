@@ -3,12 +3,10 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { isUpcoming, localDate, metrics, needsReview, safeLink, statuses, verticals } from "../lib/fields";
 import type { Demo, DemoInput, Field } from "../lib/fields";
 
-const displayFields: { key: Field | "lead"; label: string; className?: string }[] = [
+const displayFields: { key: Field | "schedule"; label: string; className?: string }[] = [
   { key: "company", label: "Company", className: "wide-cell" },
   { key: "contact", label: "Contact" },
-  { key: "demoDate", label: "Demo date" },
-  { key: "demoTime", label: "Time" },
-  { key: "lead", label: "Lead" },
+  { key: "schedule", label: "Demo date / time", className: "wide-cell" },
   { key: "vertical", label: "Vertical" },
   { key: "status", label: "Status" }
 ];
@@ -67,50 +65,46 @@ export default function Tracker() {
     }
   }
 
-  return <>
-    <main>
-      <div className="toolbar">
-        <input className="search" aria-label="Search demos" placeholder="Search demos..." value={search} onChange={e => setSearch(e.target.value)} />
-        <select aria-label="Filter status" value={status} onChange={e => setStatus(e.target.value)}>
-          <option value="">All statuses</option>
-          {statuses.map(s => <option key={s}>{s}</option>)}
-        </select>
+  return <main>
+    <div className="toolbar">
+      <input className="search" aria-label="Search demos" placeholder="Search demos..." value={search} onChange={e => setSearch(e.target.value)} />
+      <select aria-label="Filter status" value={status} onChange={e => setStatus(e.target.value)}>
+        <option value="">All statuses</option>
+        {statuses.map(s => <option key={s}>{s}</option>)}
+      </select>
+    </div>
+
+    <section className="stats" aria-label="Demo overview">
+      {[
+        ["Total demos", stats.total, "All records"],
+        ["Upcoming", stats.upcoming, "Scheduled from today"],
+        ["Showed", stats.shows, `${stats.noShows} no shows`],
+        ["Show rate", stats.showRate === null ? "-" : `${stats.showRate}%`, "Past demos only"],
+        ["Needs update", stats.needsUpdate, "Missing details"]
+      ].map(([label, value, hint]) => <button key={label} className={`stat ${view === label.toString().toLowerCase().split(" ")[0] ? "active" : ""}`} onClick={() => {
+        if (label === "Upcoming") setView(view === "upcoming" ? "all" : "upcoming");
+        else if (label === "Needs update") setView(view === "review" ? "all" : "review");
+        else setView("all");
+      }}><span>{label}</span><strong>{value}</strong><small>{hint}</small></button>)}
+    </section>
+
+    {error && <div className="alert error" role="alert">{error}<button onClick={() => setError("")}>Dismiss</button></div>}
+    {notice && <div className="notice" role="status">{notice}<button onClick={() => setNotice("")}>Dismiss</button></div>}
+
+    <section className="demo-list" aria-label="Demo list">
+      <div className="list-head">
+        <strong>{filtered.length} of {demos.length} demos</strong>
+        {(search || status || view !== "all") && <button className="text-button" onClick={() => { setSearch(""); setStatus(""); setView("all"); }}>Clear filters</button>}
       </div>
-
-      <section className="stats" aria-label="Demo overview">
-        {[
-          ["Total demos", stats.total, "All records"],
-          ["Upcoming", stats.upcoming, "Scheduled from today"],
-          ["Showed", stats.shows, `${stats.noShows} no shows`],
-          ["Show rate", stats.showRate === null ? "-" : `${stats.showRate}%`, "Past demos only"],
-          ["Needs update", stats.needsUpdate, "Missing details"]
-        ].map(([label, value, hint]) => <button key={label} className={`stat ${view === label.toString().toLowerCase().split(" ")[0] ? "active" : ""}`} onClick={() => {
-          if (label === "Upcoming") setView(view === "upcoming" ? "all" : "upcoming");
-          else if (label === "Needs update") setView(view === "review" ? "all" : "review");
-          else setView("all");
-        }}><span>{label}</span><strong>{value}</strong><small>{hint}</small></button>)}
-      </section>
-
-      {error && <div className="alert error" role="alert">{error}<button onClick={() => setError("")}>Dismiss</button></div>}
-      {notice && <div className="notice" role="status">{notice}<button onClick={() => setNotice("")}>Dismiss</button></div>}
-
-      <section className="demo-list" aria-label="Demo list">
-        <div className="list-head">
-          <strong>{filtered.length} of {demos.length} demos</strong>
-          {(search || status || view !== "all") && <button className="text-button" onClick={() => { setSearch(""); setStatus(""); setView("all"); }}>Clear filters</button>}
-        </div>
-        <div className="grid-scroll">
-          <table>
-            <thead><tr>{displayFields.map(field => <th className={field.className} key={field.key}>{field.label}</th>)}</tr></thead>
-            <tbody>
-              {filtered.map(demo => <EditableRow demo={demo} key={demo.id} save={saveField} />)}
-            </tbody>
-          </table>
-          {loading ? <div className="empty">Loading demos...</div> : !filtered.length && <div className="empty">No demos match this view.</div>}
-        </div>
-      </section>
-    </main>
-  </>;
+      <div className="grid-scroll">
+        <table>
+          <thead><tr>{displayFields.map(field => <th className={field.className} key={field.key}>{field.label}</th>)}</tr></thead>
+          <tbody>{filtered.map(demo => <EditableRow demo={demo} key={demo.id} save={saveField} />)}</tbody>
+        </table>
+        {loading ? <div className="empty">Loading demos...</div> : !filtered.length && <div className="empty">No demos match this view.</div>}
+      </div>
+    </section>
+  </main>;
 }
 
 function EditableRow({ demo, save }: { demo: Demo; save: (id: string, value: Partial<DemoInput>) => Promise<void> }) {
@@ -118,9 +112,7 @@ function EditableRow({ demo, save }: { demo: Demo; save: (id: string, value: Par
   const [saving, setSaving] = useState(false);
   const saveQueue = useRef(Promise.resolve());
 
-  useEffect(() => {
-    setDraft(demo);
-  }, [demo]);
+  useEffect(() => { setDraft(demo); }, [demo]);
 
   async function commit(key: Field, value: string) {
     if (demo[key] === value) return;
@@ -134,27 +126,32 @@ function EditableRow({ demo, save }: { demo: Demo; save: (id: string, value: Par
 
   return <tr className={saving ? "saving" : ""}>
     {displayFields.map(field => <td className={field.className} key={field.key}>
-      {field.key === "lead" ? linkFor(draft) ? <a className="lead-icon" href={linkFor(draft)} target="_blank" rel="noreferrer" aria-label={`Open lead for ${draft.company}`}>☕</a> : <span className="muted">-</span>
+      {field.key === "company" ? <span className="company-links">{leadLinkFor(draft) ? <a className="company-link" href={leadLinkFor(draft)} target="_blank" rel="noreferrer" aria-label={`Open lead for ${draft.company}`}>{draft.company}</a> : <span>{draft.company}</span>}{callLogLinkFor(draft) && <a className="recording-icon" href={callLogLinkFor(draft)} target="_blank" rel="noreferrer" aria-label={`Open recording for ${draft.company}`}>☕</a>}</span>
+        : field.key === "schedule" ? <span className={!draft.demoDate ? "muted" : ""}>{formatSchedule(draft)}</span>
         : field.key === "vertical" ? <select className={`vertical ${verticalClass(draft.vertical)}`} aria-label={`Vertical for ${draft.company}`} value={draft.vertical} onChange={async e => {
           const next = { ...draft, vertical: e.target.value };
           setDraft(next);
           await commit("vertical", next.vertical);
         }}><option value="">Choose</option>{verticals.map(v => <option key={v}>{v}</option>)}</select>
         : field.key === "status" ? <select className={`status ${statusClass(draft.status)}`} aria-label={`Status for ${draft.company}`} value={draft.status} onChange={async e => {
-        const next = { ...draft, status: e.target.value };
-        setDraft(next);
-        await commit("status", next.status);
-      }}>{statuses.map(s => <option key={s}>{s}</option>)}</select>
-        : <span className={!draft[field.key] ? "muted" : ""}>{formatValue(field.key, draft[field.key])}</span>}
+          const next = { ...draft, status: e.target.value };
+          setDraft(next);
+          await commit("status", next.status);
+        }}>{statuses.map(s => <option key={s}>{s}</option>)}</select>
+        : <span className={!draft[field.key] ? "muted" : ""}>{draft[field.key] || "-"}</span>}
     </td>)}
   </tr>;
 }
 
 const statusClass = (status: string) => ({ Showed: "green", "No Show": "red", Cancelled: "red", Upcoming: "amber", Tentative: "violet", Rescheduled: "blue", "Closed Won": "green", "Closed Lost": "red", Disqualified: "slate" }[status] || "gray");
 const verticalClass = (vertical: string) => ({ Roofing: "roofing", HVAC: "hvac", Plumbing: "plumbing", Remodeling: "remodeling", Construction: "construction", Energy: "energy", Distributor: "distributor" }[vertical] || "other");
-const linkFor = (demo: DemoInput) => safeLink(demo.crmLink) || (demo.companyId ? `https://secure.coffee.inc/#/queue?from=CallLog&companyId=${encodeURIComponent(demo.companyId)}` : undefined);
-const formatValue = (key: Field, value: string) => {
-  if (!value) return "-";
-  if (key === "demoDate" || key === "bookedDate") return new Date(value + "T12:00:00").toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" });
-  return value;
+const leadLinkFor = (demo: DemoInput) => safeLink(demo.crmLink) || (demo.companyId ? `https://secure.coffee.inc/#/queue?from=CallLog&companyId=${encodeURIComponent(demo.companyId)}` : undefined);
+const callLogLinkFor = (demo: DemoInput) => demo.phoneCallId ? `https://secure.coffee.inc/#/call-log/${encodeURIComponent(demo.phoneCallId)}` : undefined;
+const formatDate = (value: string) => value ? new Date(value + "T12:00:00").toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" }) : "";
+const formatTime = (value: string) => {
+  if (!value) return "";
+  const [hourText, minute] = value.split(":");
+  const hour = Number(hourText);
+  return `${hour % 12 || 12}:${minute} ${hour < 12 ? "AM" : "PM"}`;
 };
+const formatSchedule = (demo: DemoInput) => demo.demoDate ? [formatDate(demo.demoDate), formatTime(demo.demoTime), demo.timeZone].filter(Boolean).join(" ") : "-";
